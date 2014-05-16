@@ -16,21 +16,19 @@ module RSpec
         fetch_current_example = RSpec.respond_to?(:current_example) ?
           proc { RSpec.current_example } : proc { |context| context.example }
 
-        config.around(:each) do |ex|
+        config.around(:each, [:feature, :request]) do |ex|
           example = fetch_current_example.call(self)
-          retry_count = ex.metadata[:retry] || RSpec.configuration.default_retry_count
+          retry_count = [ex.metadata[:retry] || RSpec.configuration.default_retry_count, 1].max
           sleep_interval = ex.metadata[:retry_wait] || RSpec.configuration.default_sleep_interval
 
           clear_lets = ex.metadata[:clear_lets_on_failure]
           clear_lets = RSpec.configuration.clear_lets_on_failure if clear_lets.nil?
 
           retry_count.times do |i|
-            if RSpec.configuration.verbose_retry?
-              if i > 0
+            if RSpec.configuration.verbose_retry? and i > 0
                 message = "RSpec::Retry: #{RSpec::Retry.ordinalize(i + 1)} try #{example.location}"
                 message = "\n" + message if i == 1
                 RSpec.configuration.reporter.message(message)
-              end
             end
             example.clear_exception
             ex.run
