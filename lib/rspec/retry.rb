@@ -63,6 +63,31 @@ module RSpec
 						sleep sleep_interval if sleep_interval.to_i > 0
 					end
 				end
+				
+				# FIXME: don't be utterly stupid and reuse this block.
+				config.around(:each, type: :production) do |ex|
+					example        = fetch_current_example.call(self)
+					retry_count    = [ex.metadata[:retry] || RSpec.configuration.default_retry_count, 1].max
+					sleep_interval = ex.metadata[:retry_wait] || RSpec.configuration.default_sleep_interval
+
+					clear_lets = ex.metadata[:clear_lets_on_failure]
+					clear_lets = RSpec.configuration.clear_lets_on_failure if clear_lets.nil?
+
+					retry_count.times do |i|
+						if RSpec.configuration.verbose_retry? and i > 0
+							message = "RSpec::Retry: #{RSpec::Retry.ordinalize(i + 1)} try #{example.location}"
+							message = "\n" + message if i == 1
+							RSpec.configuration.reporter.message(message)
+						end
+						example.clear_exception
+						ex.run
+
+						break if example.exception.nil?
+
+						self.clear_lets if clear_lets
+						sleep sleep_interval if sleep_interval.to_i > 0
+					end
+				end				
 			end
 		end
 
